@@ -7,19 +7,16 @@
 
 module hyperbus_synchronous #(
     parameter int unsigned  NumPhys               = 2,
-    parameter int unsigned  AxiAddrWidth          = -1,
-    parameter int unsigned  AxiDataWidth          = -1,
-    parameter int unsigned  AxiIdWidth            = -1,
-    parameter int unsigned  AxiUserWidth          = -1,
-    parameter type          axi_req_t             = logic,
-    parameter type          axi_rsp_t             = logic,
-    parameter int unsigned  RegDataWidth          = -1,
+    parameter int unsigned  ObiAddrWidth          = 32,
+    parameter int unsigned  ObiDataWidth          = 32,
+    parameter int unsigned  ObiIdWidth            = 4,
+    parameter type          obi_req_t             = logic,
+    parameter type          obi_rsp_t             = logic,
+    parameter int unsigned  RegDataWidth          = 32,
     parameter int unsigned  RegAddrWidth          = 32,
     parameter type          reg_req_t             = logic,
     parameter type          reg_rsp_t             = logic,
-    parameter type          axi_rule_t            = logic,
-    parameter int unsigned  AxiMaxReadTxns        = 4,
-    parameter int unsigned  AxiMaxWriteTxns       = 4,
+    parameter type          rule_t                = logic,
     parameter int unsigned  HostWriteBufferBytes  = 64,
     parameter int unsigned  PhyStartupCycles      = 300 * 200,
     parameter int unsigned  SyncStages            = 2
@@ -31,8 +28,8 @@ module hyperbus_synchronous #(
 `endif
     input  logic                        test_mode_i,
 
-    input  axi_req_t                    axi_req_i,
-    output axi_rsp_t                    axi_rsp_o,
+    input  obi_req_t                    obi_req_i,
+    output obi_rsp_t                    obi_rsp_o,
 
     input  reg_req_t                    reg_req_i,
     output reg_rsp_t                    reg_rsp_o,
@@ -49,14 +46,12 @@ module hyperbus_synchronous #(
     output logic [NumPhys-1:0]               hyper_reset_no
 );
 
-    `ASSERT_INIT(AxiAddrWidthValid, AxiAddrWidth >= $clog2(AxiDataWidth / 8))
-    `ASSERT_INIT(AxiMaxReadTxnsValid, AxiMaxReadTxns >= 1)
-    `ASSERT_INIT(AxiMaxWriteTxnsValid, AxiMaxWriteTxns >= 1)
 
-    typedef logic [AxiAddrWidth-1:0]   host_addr_t;
-    typedef logic [AxiDataWidth-1:0]   host_data_t;
-    typedef logic [AxiDataWidth/8-1:0] host_strb_t;
-    localparam int unsigned AxiDataBytes = AxiDataWidth / 8;
+
+    typedef logic [ObiAddrWidth-1:0]      host_addr_t;
+    typedef logic [ObiDataWidth-1:0]      host_data_t;
+    typedef logic [ObiDataWidth/8-1:0]    host_strb_t;
+    
     `HYPERBUS_TYPEDEF_HOST_ALL_CT(host, host_addr_t, host_data_t, host_strb_t)
     `HYPERBUS_TYPEDEF_LINK_ALL_CT(hyper, NumPhys)
 
@@ -83,7 +78,7 @@ module hyperbus_synchronous #(
     logic                      backend_cfg_apply_ready;
 
     hyperbus_pkg::frontend_cfg_t frontend_cfg;
-    axi_rule_t [hyperbus_pkg::HyperNumChips-1:0] frontend_chip_rules;
+    rule_t [hyperbus_pkg::HyperNumChips-1:0] frontend_chip_rules;
 
     ////////////////////
     // Dataflow links //
@@ -117,7 +112,7 @@ module hyperbus_synchronous #(
         .NumPhys       ( NumPhys       ),
         .reg_req_t     ( reg_req_t     ),
         .reg_rsp_t     ( reg_rsp_t     ),
-        .host_rule_t   ( axi_rule_t    ),
+        .host_rule_t   ( rule_t    ),
         .RegDataWidth  ( RegDataWidth  ),
         .RegAddrWidth  ( RegAddrWidth  )
     ) i_cfg_frontend (
@@ -142,30 +137,33 @@ module hyperbus_synchronous #(
     );
 
     //////////////////
-    // AXI frontend //
+    // OBI frontend //
     //////////////////
 
-    hyperbus_axi_frontend #(
-        .AxiDataWidth      ( AxiDataWidth                          ),
-        .AxiAddrWidth      ( AxiAddrWidth                          ),
-        .AxiIdWidth        ( AxiIdWidth                            ),
-        .AxiUserWidth      ( AxiUserWidth                          ),
-        .AxiMaxReadTxns    ( AxiMaxReadTxns                        ),
-        .AxiMaxWriteTxns   ( AxiMaxWriteTxns                       ),
-        .MaxWriteDataBeats ( HostWriteBufferBytes / AxiDataBytes  ),
-        .axi_req_t         ( axi_req_t                              ),
-        .axi_rsp_t         ( axi_rsp_t                              ),
-        .host_req_t        ( host_req_t                             ),
-        .host_rsp_t        ( host_rsp_t                             )
-    ) i_axi_frontend (
-        .clk_i             ( clk_sys_i       ),
-        .rst_ni            ( rst_sys_ni      ),
-        .drain_i           ( frontend_drain  ),
-        .idle_o            ( host_idle       ),
-        .axi_req_i         ( axi_req_i       ),
-        .axi_rsp_o         ( axi_rsp_o       ),
-        .host_req_o         ( host_req        ),
-        .host_rsp_i         ( host_rsp        )
+
+    hyperbus_obi_frontend #(
+
+        .ObiAddrWidth(ObiAddrWidth),
+        .ObiDataWidth(ObiDataWidth),
+        .ObiIdWidth(ObiIdWidth),
+        .HostAddrWidth(ObiAddrWidth),
+        .HostDataWidth(ObiDataWidth),
+
+        .obi_req_t(obi_req_t),
+        .obi_rsp_t(obi_rsp_t),
+        .host_req_t(host_req_t),
+        .host_rsp_t(host_rsp_t)
+
+    ) i_obi_frontend (
+        .clk_i(clk_sys_i),
+        .rst_ni(rst_sys_ni),
+        .drain_i(frontend_drain),
+        .obi_req_i(obi_req_i),
+        .host_rsp_i(host_rsp),
+
+        .obi_rsp_o(obi_rsp_o),
+        .idle_o(host_idle),
+        .host_req_o(host_req)
     );
 
     ////////////
@@ -173,8 +171,8 @@ module hyperbus_synchronous #(
     ////////////
 
     hyperbus_midend #(
-        .HostAddrWidth        ( AxiAddrWidth        ),
-        .HostDataWidth        ( AxiDataWidth        ),
+        .HostAddrWidth        ( ObiAddrWidth        ),
+        .HostDataWidth        ( ObiDataWidth        ),
         .NumPhys              ( NumPhys             ),
         .HostWriteBufferBytes ( HostWriteBufferBytes ),
         .host_cmd_t            ( host_cmd_t          ),
@@ -188,7 +186,7 @@ module hyperbus_synchronous #(
         .hyper_cmd_t           ( hyper_cmd_t         ),
         .hyper_req_t           ( hyper_req_t         ),
         .hyper_rsp_t           ( hyper_rsp_t         ),
-        .rule_t                ( axi_rule_t          )
+        .rule_t                ( rule_t              )
     ) i_midend (
         .clk_i             ( clk_sys_i              ),
         .rst_ni            ( rst_sys_ni             ),

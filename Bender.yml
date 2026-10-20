@@ -36,7 +36,7 @@ sources:
         - target/xilinx/hyperbus_clk_delay.sv
         - target/xilinx/hyperbus_rwds_delay.sv
 
-    - target: test
+    - target: all(any(test,simulation,verilator),not(fpga))
       files:
         - models/configurable_delay.behav.sv
 
@@ -56,6 +56,7 @@ sources:
     - src/hyperbus_cfg_regs.sv
     - src/backend/hyperbus_phy.sv
     - src/hyperbus_axi_frontend.sv
+    - src/hyperbus_obi_frontend.sv
     - src/hyperbus_atomic_handler.sv
     - src/hyperbus_midend.sv
     - src/hyperbus_cfg_frontend.sv
