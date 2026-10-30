@@ -43,7 +43,21 @@ module hyperbus_synchronous #(
     input  logic [NumPhys-1:0][7:0]          hyper_dq_i,
     output logic [NumPhys-1:0][7:0]          hyper_dq_o,
     output logic [NumPhys-1:0]               hyper_dq_oe_o,
-    output logic [NumPhys-1:0]               hyper_reset_no
+    output logic [NumPhys-1:0]               hyper_reset_no,
+
+    input logic tag_req_ready_i,
+    input logic tag_ready_i, 
+    input logic tag_error_i,
+    input logic read_tag_i,
+    input logic read_tag_valid_i,
+
+
+    output logic tag_access_o, 
+    output logic [31:0] tag_addr_o,
+    output logic tag_we_o,
+    output logic tag_write_tag_o,
+    output logic data_done_o, 
+    output logic data_error_o
 );
 
 
@@ -163,7 +177,21 @@ module hyperbus_synchronous #(
 
         .obi_rsp_o(obi_rsp_o),
         .idle_o(host_idle),
-        .host_req_o(host_req)
+        .host_req_o(host_req),
+
+        .tag_req_ready_i(tag_req_ready_i),
+        .tag_ready_i(tag_ready_i), 
+        .tag_error_i(tag_error_i),
+        .read_tag_i(read_tag_i),
+        .read_tag_valid_i(read_tag_valid_i),
+
+
+        .tag_access_o(tag_access_o), 
+        .tag_addr_o(tag_addr_o),
+        .tag_we_o(tag_we_o),
+        .tag_write_tag_o(tag_write_tag_o),
+        .data_done_o(data_done_o), 
+        .data_error_o(data_error_o)
     );
 
     ////////////
