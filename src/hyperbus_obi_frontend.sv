@@ -114,7 +114,7 @@ assign lower_addr = obi_addr_q[1:0];
 
 // valid during SEND_COMMAND
 assign host_req_o.cmd.write = obi_we_q;
-assign host_req_o.cmd.addr = obi_addr_q;
+assign host_req_o.cmd.addr = {obi_addr_q[ObiAddrWidth-1:2], 2'b00};
 assign host_req_o.cmd.beats = 1;
 assign host_req_o.cmd.size = 2;
 assign host_req_o.cmd.burst = hyperbus_pkg::HyperBurstIncr;
@@ -198,12 +198,12 @@ always_comb begin
         end
 
         CHECK: begin
-            if (lower_addr != 2'b0) begin //wrong address format
-                err_d = 1;
-                state_d = RESPOND;
-            end 
+            // if (lower_addr != 2'b0) begin //wrong address format
+            //     err_d = 1;
+            //     state_d = RESPOND;
+            // end 
 
-            else if (obi_be_q != 4'b1111) begin //wrong be format
+            if (obi_be_q == 4'b0000) begin //wrong be format
                 err_d = 1;
                 state_d = RESPOND;
             end
