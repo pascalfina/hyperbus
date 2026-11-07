@@ -136,7 +136,9 @@ assign obi_rsp_o.r.err = err_q;
 
 
 //with tag
-assign obi_rsp_o.r.r_optional = obi_read_tag_q;
+assign obi_rsp_o.r.r_optional.cap_tag = obi_read_tag_q;
+// The legacy tag-SRAM path does not supply ECC.
+assign obi_rsp_o.r.r_optional.ecc = '0;
 
 
 //valid during TAG_REQUEST
@@ -192,7 +194,7 @@ always_comb begin
                 obi_be_d = obi_req_i.a.be;
                 obi_wdata_d = obi_req_i.a.wdata;
                 obi_aid_d = obi_req_i.a.aid;
-                obi_write_tag_d = obi_req_i.a.a_optional;
+                obi_write_tag_d = obi_req_i.a.a_optional.cap_tag;
                 state_d = CHECK;
             end
         end
