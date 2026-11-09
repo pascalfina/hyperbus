@@ -163,7 +163,7 @@ module hyperbus_read_adapter #(
             end
             // Accumulate physical words until one complete host beat is available.
             CollectPhy: begin
-                converted_ready = 1'b1;
+                converted_ready = !enough_data_q;
                 if (enough_data) begin
                     state_d = EmitHost;
                 end
