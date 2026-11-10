@@ -7,11 +7,10 @@
 
 module hyperbus_synchronous #(
     parameter int unsigned  NumPhys               = 2,
-    parameter int unsigned  ObiAddrWidth          = 32,
-    parameter int unsigned  ObiDataWidth          = 32,
-    parameter int unsigned  ObiIdWidth            = 4,
-    parameter type          obi_req_t             = logic,
-    parameter type          obi_rsp_t             = logic,
+    parameter int unsigned HostAddrWidth          = 32,
+    parameter int unsigned HostDataWidth          = 32,
+    parameter type         host_req_t             = logic,
+    parameter type         host_rsp_t              = logic,
     parameter int unsigned  RegDataWidth          = 32,
     parameter int unsigned  RegAddrWidth          = 32,
     parameter type          reg_req_t             = logic,
@@ -28,8 +27,11 @@ module hyperbus_synchronous #(
 `endif
     input  logic                        test_mode_i,
 
-    input  obi_req_t                    obi_req_i,
-    output obi_rsp_t                    obi_rsp_o,
+    input  host_req_t host_req_i,
+    output host_rsp_t host_rsp_o,
+
+    output logic drain_o,
+    input  logic host_idle_i,
 
     input  reg_req_t                    reg_req_i,
     output reg_rsp_t                    reg_rsp_o,
@@ -43,30 +45,14 @@ module hyperbus_synchronous #(
     input  logic [NumPhys-1:0][7:0]          hyper_dq_i,
     output logic [NumPhys-1:0][7:0]          hyper_dq_o,
     output logic [NumPhys-1:0]               hyper_dq_oe_o,
-    output logic [NumPhys-1:0]               hyper_reset_no,
+    output logic [NumPhys-1:0]               hyper_reset_no
 
-    input logic tag_req_ready_i,
-    input logic tag_ready_i, 
-    input logic tag_error_i,
-    input logic read_tag_i,
-    input logic read_tag_valid_i,
-
-
-    output logic tag_access_o, 
-    output logic [31:0] tag_addr_o,
-    output logic tag_we_o,
-    output logic tag_write_tag_o,
-    output logic data_done_o, 
-    output logic data_error_o
 );
+    typedef type(host_req_i.cmd)  host_cmd_t;
+    typedef type(host_req_i.w)    host_w_t;
+    typedef type(host_rsp_o.r)    host_r_t;
+    typedef type(host_rsp_o.wrsp) host_wrsp_t;
 
-
-
-    typedef logic [ObiAddrWidth-1:0]      host_addr_t;
-    typedef logic [ObiDataWidth-1:0]      host_data_t;
-    typedef logic [ObiDataWidth/8-1:0]    host_strb_t;
-    
-    `HYPERBUS_TYPEDEF_HOST_ALL_CT(host, host_addr_t, host_data_t, host_strb_t)
     `HYPERBUS_TYPEDEF_LINK_ALL_CT(hyper, NumPhys)
 
     /////////////////////
@@ -85,8 +71,6 @@ module hyperbus_synchronous #(
     logic                      frontend_cfg_apply_ready;
     logic                      frontend_cfg_apply_done;
     logic                      frontend_clock_div_apply_valid;
-    logic                      frontend_drain;
-    logic                      host_idle;
     hyperbus_pkg::phy_cfg_t    backend_cfg_apply;
     logic                      backend_cfg_apply_valid;
     logic                      backend_cfg_apply_ready;
@@ -98,8 +82,6 @@ module hyperbus_synchronous #(
     // Dataflow links //
     ////////////////////
 
-    host_req_t                host_req;
-    host_rsp_t                host_rsp;
     hyper_req_t               midend_req;
     hyper_rsp_t               midend_rsp;
     logic                     midend_trans_active;
@@ -134,8 +116,8 @@ module hyperbus_synchronous #(
         .rst_ni             ( rst_sys_ni               ),
         .reg_req_i          ( reg_req_i                ),
         .reg_rsp_o          ( reg_rsp_o                ),
-        .drain_o            ( frontend_drain           ),
-        .host_idle_i        ( host_idle                ),
+        .drain_o            ( drain_o                  ),
+        .host_idle_i        ( host_idle_i              ),
         .trans_active_i     ( midend_trans_active      ),
         .cfg_apply_o        ( frontend_cfg_apply       ),
         .cfg_apply_valid_o  ( frontend_cfg_apply_valid ),
@@ -150,57 +132,14 @@ module hyperbus_synchronous #(
         .decode_error_i     ( midend_decode_error      )
     );
 
-    //////////////////
-    // OBI frontend //
-    //////////////////
-
-
-    hyperbus_obi_frontend #(
-
-        .ObiAddrWidth(ObiAddrWidth),
-        .ObiDataWidth(ObiDataWidth),
-        .ObiIdWidth(ObiIdWidth),
-        .HostAddrWidth(ObiAddrWidth),
-        .HostDataWidth(ObiDataWidth),
-
-        .obi_req_t(obi_req_t),
-        .obi_rsp_t(obi_rsp_t),
-        .host_req_t(host_req_t),
-        .host_rsp_t(host_rsp_t)
-
-    ) i_obi_frontend (
-        .clk_i(clk_sys_i),
-        .rst_ni(rst_sys_ni),
-        .drain_i(frontend_drain),
-        .obi_req_i(obi_req_i),
-        .host_rsp_i(host_rsp),
-
-        .obi_rsp_o(obi_rsp_o),
-        .idle_o(host_idle),
-        .host_req_o(host_req),
-
-        .tag_req_ready_i(tag_req_ready_i),
-        .tag_ready_i(tag_ready_i), 
-        .tag_error_i(tag_error_i),
-        .read_tag_i(read_tag_i),
-        .read_tag_valid_i(read_tag_valid_i),
-
-
-        .tag_access_o(tag_access_o), 
-        .tag_addr_o(tag_addr_o),
-        .tag_we_o(tag_we_o),
-        .tag_write_tag_o(tag_write_tag_o),
-        .data_done_o(data_done_o), 
-        .data_error_o(data_error_o)
-    );
 
     ////////////
     // Midend //
     ////////////
 
     hyperbus_midend #(
-        .HostAddrWidth        ( ObiAddrWidth        ),
-        .HostDataWidth        ( ObiDataWidth        ),
+        .HostAddrWidth        ( HostAddrWidth        ),
+        .HostDataWidth        ( HostDataWidth        ),
         .NumPhys              ( NumPhys             ),
         .HostWriteBufferBytes ( HostWriteBufferBytes ),
         .host_cmd_t            ( host_cmd_t          ),
@@ -218,8 +157,8 @@ module hyperbus_synchronous #(
     ) i_midend (
         .clk_i             ( clk_sys_i              ),
         .rst_ni            ( rst_sys_ni             ),
-        .host_link_req_i   ( host_req               ),
-        .host_link_rsp_o   ( host_rsp               ),
+        .host_link_req_i   ( host_req_i              ),
+        .host_link_rsp_o   ( host_rsp_o              ),
         .frontend_cfg_i    ( frontend_cfg           ),
         .chip_rules_i      ( frontend_chip_rules    ),
         .trans_active_o    ( midend_trans_active    ),
