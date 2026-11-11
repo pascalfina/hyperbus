@@ -163,7 +163,9 @@ module hyperbus_atomic_handler #(
     host_data_t compare_value,  swap_value;
     host_data_t alu_result,     shifted_alu_result;
     host_data_t preserved_data, write_data;
-    int unsigned byte_offset, operand_bytes, operand_bits;
+    // 32-bit unsigned like int unsigned, but 4-state: a 2-state variable gets an
+    // implicit init value that conflicts with constant bits in Yosys opt_merge.
+    logic [31:0] byte_offset, operand_bytes, operand_bits;
     logic alu_enable, alu_equal;
     logic alu_signed_less, alu_unsigned_less;
 
