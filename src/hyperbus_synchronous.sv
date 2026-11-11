@@ -33,6 +33,8 @@ module hyperbus_synchronous #(
     output logic drain_o,
     input  logic host_idle_i,
 
+    output logic cfg_ready_o,
+
     input  reg_req_t                    reg_req_i,
     output reg_rsp_t                    reg_rsp_o,
 
@@ -123,6 +125,7 @@ module hyperbus_synchronous #(
         .cfg_apply_valid_o  ( frontend_cfg_apply_valid ),
         .cfg_apply_ready_i  ( frontend_cfg_apply_ready ),
         .cfg_apply_done_i   ( frontend_cfg_apply_done  ),
+        .cfg_ready_o        ( cfg_ready_o              ),
         .clock_div_apply_o       (                                ),
         .clock_div_apply_valid_o ( frontend_clock_div_apply_valid ),
         .clock_div_apply_ready_i ( 1'b1                           ),

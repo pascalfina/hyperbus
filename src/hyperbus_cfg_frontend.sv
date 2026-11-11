@@ -25,6 +25,7 @@ module hyperbus_cfg_frontend #(
     output logic                         cfg_apply_valid_o,
     input  logic                         cfg_apply_ready_i,
     input  logic                         cfg_apply_done_i,
+    output logic                         cfg_ready_o,
     output logic [7:0]                   clock_div_apply_o,
     output logic                         clock_div_apply_valid_o,
     input  logic                         clock_div_apply_ready_i,
@@ -75,6 +76,17 @@ module hyperbus_cfg_frontend #(
     assign cfg_apply_valid_o = cfg_state_q == CfgPhySend;
     assign clock_div_apply_o = pending_frontend_q.divider;
     assign clock_div_apply_valid_o = cfg_state_q == CfgClockSend;
+
+    logic software_apply_seen_q;
+
+    `FFARN(software_apply_seen_q,
+    software_apply_seen_q || ((cfg_state_q == CfgIdle) && command_apply),
+    1'b0, clk_i, rst_ni)
+
+    assign cfg_ready_o = software_apply_seen_q && (cfg_state_q == CfgIdle) && !cfg_changed;
+
+
+
 
     // STATUS reads and W1C writes stay live while a barrier is in progress.
     reg_req_t cfg_reg_req;
