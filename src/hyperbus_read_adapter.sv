@@ -63,6 +63,8 @@ module hyperbus_read_adapter #(
     logic                         enough_data_q;
     logic                         sent_available_data;
     logic [BurstLength-1:0]       next_host_addr;
+    logic [BurstLength-1:0]       following_host_addr;
+    logic                         enough_data_following;
     logic                         host_last;
     logic                         host_accepted;
     logic                         converted_accepted;
@@ -78,6 +80,8 @@ module hyperbus_read_adapter #(
     assign enough_data         = byte_phy_cnt_d >= next_host_addr;
     assign enough_data_q       = byte_phy_cnt_q >= next_host_addr;
     assign sent_available_data = byte_host_addr_d >= byte_phy_cnt_q;
+    assign following_host_addr   = ((byte_host_addr_d >> size_q) << size_q) + (1 << size_q);
+    assign enough_data_following = byte_phy_cnt_d >= following_host_addr;
     assign host_last           = data_buffer_q.last && (last_addr_q == next_host_addr);
     assign host_accepted       = host_valid_o && host_ready_i;
     assign converted_accepted  = converted_valid && converted_ready;
@@ -177,7 +181,13 @@ module hyperbus_read_adapter #(
                         state_d = Idle;
                     end else if (sent_available_data) begin
                         converted_ready = 1'b1;
-                        state_d = converted_valid ? CollectPhy : WaitPhy;
+                        if (!converted_valid) begin
+                            state_d = WaitPhy;
+                        end else if (enough_data_following) begin
+                            state_d = EmitHost;
+                        end else begin
+                            state_d = CollectPhy;
+                        end
                     end
                 end
             end
